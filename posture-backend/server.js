@@ -8,7 +8,7 @@ const server = http.createServer(app);
 
 const io = socketIo(server, {
   cors: {
-    origin: ["http://localhost:5173","https://posturerepo.onrender.com","https://posturerepo.vercel.app"], 
+    origin: "https://posturerepo.vercel.app", 
     methods: ["GET", "POST"]
   }
 });
