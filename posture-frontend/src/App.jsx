@@ -353,7 +353,7 @@ if (poses && poses.length > 0 && poses[0].keypoints) {
               )}
               <canvas
                 ref={canvasRef}
-                className="absolute inset-0 w-full h-full object-contain pointer-events-none" 
+                className="absolute inset-0 w-full h-full object-contain pointer-events-none" // Canvas overlays video
                 style={{ zIndex: 10 }}
               ></canvas>
             </>
