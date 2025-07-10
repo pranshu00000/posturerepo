@@ -10,37 +10,36 @@ import {
   AcademicCapIcon,
 } from "@heroicons/react/24/solid";
 
-// TensorFlow.js imports
+
 import * as tf from "@tensorflow/tfjs";
 import * as poseDetection from "@tensorflow-models/pose-detection";
 
-// Initialize Socket.IO client
-const socket = io("http://localhost:5000"); // Connect to your Node.js backend
+
+const socket = io("https://posturerepo.onrender.com/"); 
 
 function App() {
-  const videoRef = useRef(null); // For uploaded video
-  const canvasRef = useRef(null); // For drawing keypoints
-  const webcamRef = useRef(null); // For webcam stream
+  const videoRef = useRef(null); 
+  const canvasRef = useRef(null); 
+  const webcamRef = useRef(null); 
 
   const [isCapturing, setIsCapturing] = useState(false);
   const [postureFeedback, setPostureFeedback] = useState([]);
   const [currentVideoFile, setCurrentVideoFile] = useState(null);
   const [useWebcam, setUseWebcam] = useState(false);
-  const [postureType, setPostureType] = useState("squat"); // 'squat' or 'desk'
-  const [model, setModel] = useState(null); // TensorFlow.js MoveNet model
-  const [modelLoading, setModelLoading] = useState(true); // State for model loading
+  const [postureType, setPostureType] = useState("squat");
+  const [model, setModel] = useState(null); 
+  const [modelLoading, setModelLoading] = useState(true); 
 
-  const captureInterval = useRef(null); // To store the interval ID for frame capture
+  const captureInterval = useRef(null); 
 
-  // Load the MoveNet model once on component mount
+
   useEffect(() => {
     async function loadModel() {
   try {
     setModelLoading(true);
 
-    // Ensure TensorFlow backend is ready
-    await tf.setBackend('webgl'); // or 'cpu' if you're on a low-end device
-    await tf.ready(); // Wait for the backend to be ready
+    await tf.setBackend('webgl'); 
+    await tf.ready(); 
 
     const loadedModel = await poseDetection.createDetector(
       poseDetection.SupportedModels.MoveNet,
@@ -60,9 +59,8 @@ function App() {
 }
 
     loadModel();
-  }, []); // Empty dependency array means this runs once on mount
+  }, []); 
 
-  // Effect for handling Socket.IO events
   useEffect(() => {
     socket.on("connect", () => {
       console.log("Connected to backend Socket.IO");
@@ -71,7 +69,6 @@ function App() {
     socket.on("postureFeedback", (data) => {
       console.log("Received feedback:", data);
       setPostureFeedback(data.issues);
-      // Draw the keypoints received from the backend (which are the ones we sent)
       drawKeypoints(data.keypoints);
     });
 
@@ -83,17 +80,15 @@ function App() {
       console.error("Socket error:", error);
     });
 
-    // Cleanup on component unmount
     return () => {
       socket.off("connect");
       socket.off("postureFeedback");
       socket.off("disconnect");
       socket.off("error");
-      stopCapture(); // Ensure capture stops if component unmounts
+      stopCapture(); 
     };
   }, []);
 
-  // Function to draw keypoints on the canvas
   const drawKeypoints = useCallback(
     (keypoints) => {
       const canvas = canvasRef.current;
@@ -102,34 +97,23 @@ function App() {
 
       if (!video || video.paused || video.ended || !canvas) return;
 
-      // Clear canvas for new drawing
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw video frame onto canvas (important for visual alignment)
-      // The video element itself is displayed, this canvas is just for drawing on top.
-      // We draw the video frame here to ensure keypoints are aligned correctly
-      // even if the video element's rendering is slightly off from canvas.
+
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Set drawing style for keypoints
       ctx.fillStyle = "red";
       ctx.strokeStyle = "red";
       ctx.lineWidth = 2;
 
-      // Draw circles for each keypoint
       keypoints.forEach((kp) => {
-        // MoveNet keypoints have x, y, and score.
-        // x and y are normalized coordinates [0,1].
-        // We need to scale them to canvas dimensions.
         if (kp.score > 0.3) {
-          // Only draw keypoints with a certain confidence
           ctx.beginPath();
-          ctx.arc(kp.x * canvas.width, kp.y * canvas.height, 5, 0, 2 * Math.PI); // Draw a circle of radius 5
+          ctx.arc(kp.x * canvas.width, kp.y * canvas.height, 5, 0, 2 * Math.PI); 
           ctx.fill();
         }
       });
 
-      // Define connections for drawing skeleton (based on MoveNet keypoint names)
       const connections = [
         ["left_shoulder", "right_shoulder"],
         ["left_shoulder", "left_elbow"],
@@ -151,7 +135,6 @@ function App() {
         ["right_shoulder", "nose"],
       ];
 
-      // Draw lines for connections
       connections.forEach(([p1Name, p2Name]) => {
         const p1 = keypoints.find((kp) => kp.name === p1Name);
         const p2 = keypoints.find((kp) => kp.name === p2Name);
@@ -167,7 +150,6 @@ function App() {
     [useWebcam]
   );
 
-  // Function to perform pose estimation and send keypoints
   const processFrame = useCallback(async () => {
     if (!model) {
       console.warn("MoveNet model not loaded yet.");
@@ -178,11 +160,9 @@ function App() {
     const canvas = canvasRef.current;
 
     if (!video || video.paused || video.ended || !canvas) {
-      // console.log("Video not ready or canvas not available for processing.");
       return;
     }
 
-    // Ensure canvas dimensions match video for accurate drawing and model input
     canvas.width = video.videoWidth || video.offsetWidth;
     canvas.height = video.videoHeight || video.offsetHeight;
 
@@ -191,11 +171,9 @@ function App() {
       return;
     }
 
-    // Create a TensorFlow tensor from the video element
     const imageTensor = tf.browser.fromPixels(video);
 
     try {
-      // Estimate pose using the loaded MoveNet model
       const poses = await model.estimatePoses(imageTensor);
 
 if (poses && poses.length > 0 && poses[0].keypoints) {
@@ -210,20 +188,17 @@ if (poses && poses.length > 0 && poses[0].keypoints) {
         "Error processing video frame for pose detection.",
       ]);
     } finally {
-      imageTensor.dispose(); // Dispose the tensor to free up memory
+      imageTensor.dispose();
     }
   }, [model, useWebcam, postureType]);
 
-  // Start capturing frames and sending for processing
   const startCapture = useCallback(() => {
-    if (isCapturing || modelLoading || !model) return; // Prevent multiple intervals or if model not ready
+    if (isCapturing || modelLoading || !model) return; 
     setIsCapturing(true);
-    setPostureFeedback([]); // Clear previous feedback
+    setPostureFeedback([]); 
 
-    // Set up an interval to process frames every 100ms (10 FPS)
-    captureInterval.current = setInterval(processFrame, 100);
+    captureInterval.current = setInterval(processFrame, 1000);
 
-    // If using video file, ensure it plays
     if (videoRef.current && currentVideoFile && !useWebcam) {
       videoRef.current.play();
     }
@@ -236,7 +211,6 @@ if (poses && poses.length > 0 && poses[0].keypoints) {
     useWebcam,
   ]);
 
-  // Stop capturing frames
   const stopCapture = useCallback(() => {
     setIsCapturing(false);
     if (captureInterval.current) {
@@ -246,33 +220,29 @@ if (poses && poses.length > 0 && poses[0].keypoints) {
     if (videoRef.current) {
       videoRef.current.pause();
     }
-    // Clear canvas when stopping
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-    setPostureFeedback([]); // Clear feedback
+    setPostureFeedback([]); 
   }, []);
 
-  // Handle video file upload
   const handleVideoUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
       setCurrentVideoFile(URL.createObjectURL(file));
-      setUseWebcam(false); // Switch to video file mode
-      stopCapture(); // Stop any ongoing capture
+      setUseWebcam(false); 
+      stopCapture(); 
     }
   };
 
-  // Handle webcam toggle
   const toggleWebcam = () => {
     setUseWebcam((prev) => !prev);
-    setCurrentVideoFile(null); // Clear video file if switching to webcam
-    stopCapture(); // Stop any ongoing capture
+    setCurrentVideoFile(null); 
+    stopCapture(); 
   };
 
-  // Set video dimensions dynamically for canvas
   const handleVideoCanPlay = () => {
     const videoElement = useWebcam ? webcamRef.current.video : videoRef.current;
     if (videoElement && canvasRef.current) {
@@ -280,6 +250,15 @@ if (poses && poses.length > 0 && poses[0].keypoints) {
       canvasRef.current.height = videoElement.videoHeight;
     }
   };
+  const parseAngleFeedback = (feedback) => {
+  const angleRegex = /Angles:\s*([\d.]+)°\s*\/\s*([\d.]+)°/;
+  const match = feedback.match(angleRegex);
+  if (!match) return null;
+  const left = parseFloat(match[1]);
+  const right = parseFloat(match[2]);
+  return { left, right };
+};
+
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center py-8 px-4 font-inter">
@@ -352,7 +331,7 @@ if (poses && poses.length > 0 && poses[0].keypoints) {
                   screenshotFormat="image/jpeg"
                   videoConstraints={{ facingMode: "user" }}
                   className="absolute inset-0 w-full h-full object-contain"
-                  onPlay={handleVideoCanPlay} // Use onPlay for webcam to set canvas size
+                  onPlay={handleVideoCanPlay} 
                 />
               ) : (
                 currentVideoFile && (
@@ -361,9 +340,9 @@ if (poses && poses.length > 0 && poses[0].keypoints) {
                     src={currentVideoFile}
                     controls
                     loop
-                    muted // Mute for automatic playback if needed
+                    muted 
                     className="absolute inset-0 w-full h-full object-contain"
-                    onLoadedMetadata={handleVideoCanPlay} // For uploaded video
+                    onLoadedMetadata={handleVideoCanPlay} 
                   />
                 )
               )}
@@ -374,7 +353,7 @@ if (poses && poses.length > 0 && poses[0].keypoints) {
               )}
               <canvas
                 ref={canvasRef}
-                className="absolute inset-0 w-full h-full object-contain pointer-events-none" // Canvas overlays video
+                className="absolute inset-0 w-full h-full object-contain pointer-events-none" 
                 style={{ zIndex: 10 }}
               ></canvas>
             </>
@@ -411,16 +390,51 @@ if (poses && poses.length > 0 && poses[0].keypoints) {
           Posture Feedback
         </h2>
         {postureFeedback.length > 0 ? (
-          <ul className="list-disc list-inside text-red-600 text-lg">
-            {postureFeedback.map((issue, index) => (
-              <li key={index}>{issue}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-green-600 text-lg">
-            No bad posture detected (or awaiting analysis).
-          </p>
+  <ul className="list-disc list-inside text-lg">
+  {postureFeedback.map((issue, index) => {
+    const angles = parseAngleFeedback(issue);
+
+    return (
+      <li
+        key={index}
+        className={`mb-2 ${
+          issue.toLowerCase().includes("detected") ||
+          issue.toLowerCase().includes("over toe") ||
+          issue.toLowerCase().includes("bent") ||
+          issue.toLowerCase().includes("slouch") ||
+          issue.toLowerCase().includes("insufficient")
+            ? "text-red-600"
+            : "text-green-600"
+        }`}
+      >
+        {issue}
+        {angles && (
+          <div className="flex gap-2 mt-1 ml-4">
+            <span
+              className={`text-sm px-2 py-1 rounded-full font-semibold ${
+                angles.left >= 150 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+              }`}
+            >
+              Left: {angles.left}°
+            </span>
+            <span
+              className={`text-sm px-2 py-1 rounded-full font-semibold ${
+                angles.right >= 150 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+              }`}
+            >
+              Right: {angles.right}°
+            </span>
+          </div>
         )}
+      </li>
+    );
+  })}
+</ul>
+
+) : (
+  <p className="text-green-600 text-lg">Waiting to start analysis</p>
+)}
+
       </div>
     </div>
   );
